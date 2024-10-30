@@ -24,7 +24,8 @@ from utils.model_utils import (
     int_or_str,
     load_model_and_tokenizer,
     check_module_memory,
-    retrieve_compression_config
+    retrieve_compression_config,
+    prepare_for_parallel_forward
 )
 from utils.data_utils import get_loaders
 from utils.decompose import decompose
@@ -50,6 +51,7 @@ def main():
     parser.add_argument('--k', type=int, default=1)
     parser.add_argument('--niter', type=int, default=1)
     parser.add_argument('--no_avd', action='store_true')
+    parser.add_argument('--parallel_forward', action='store_true')
     parser.add_argument('--no_fuse_scale', action='store_false', dest='fuse_scale')
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--eval_dataset', type=str, default='wikitext2')
@@ -86,19 +88,22 @@ def main():
                 compression_configs = json.load(f)
             compression_config = retrieve_compression_config(compression_configs, args.max_memory_MB)
 
-        decompose(model, args.niter, args.k, args.no_avd, init_only=True, compression_config=compression_config)
+        decompose(model, args.niter, args.k, args.no_avd, parallel_forward=args.parallel_forward, init_only=True, compression_config=compression_config)
         load_checkpoint_and_dispatch(model, args.model_name_or_path, device_map='auto', no_split_module_classes=['LlamaDecoderLayer'])
         check_empty_weights(model)
         # print peak memory usage
         memory = check_module_memory(model)
         print(f"Memory: {memory//1024**2} MB")
+        if args.parallel_forward:
+            print(f"Using parallel forward")
+            prepare_for_parallel_forward(model)
     else:
         model, tokenizer = load_model_and_tokenizer(args.model_name_or_path)
         model_name = args.model_name_or_path.split("/")[-1]
         if args.scale_weight:
             print("Scaling weights")
             scales = scale_model(model, tokenizer, args.calib_dataset, args.seed, args.nsamples, args.seqlen, args.batch_size, args.niter, args.k, args.no_avd, args.fuse_scale)
-        decompose(model, args.niter, args.k, args.no_avd, init_only=False)
+        decompose(model, args.niter, args.k, args.no_avd, parallel_forward=args.parallel_forward, init_only=False)
     
     save_path = os.path.join(args.output_dir, f'{args.model_name_or_path.split("/")[-1]}_niter_{args.niter}_k_{args.k}_no_avd_{args.no_avd}_scaled_{args.scale_weight}')
     if args.do_save:

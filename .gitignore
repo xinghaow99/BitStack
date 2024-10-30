@@ -3,3 +3,5 @@ logs
 outputs
 scripts
 inference.py
+kernel.py
+quantize_packed.py

@@ -189,3 +189,8 @@ def retrieve_compression_config(configs, max_memory_MB):
             # print(f"Config with memory {config['memory']//1024**2} MB found")
             return config['layers']
     raise ValueError(f"No config found within the memory limit {max_memory_MB} MB")
+
+def prepare_for_parallel_forward(model):
+    for name, module in model.named_modules():
+        if isinstance(module, BitStackLinear):
+            module.stack_blocks()
