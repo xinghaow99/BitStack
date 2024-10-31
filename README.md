@@ -1,22 +1,28 @@
-# BitStack: Fine-Grained Size Control for Compressed Large Language Models in Variable Memory Environments
+<p align="center">
+  <img src="./assets/icon.png" width="180" height="150"/>
+</p>
+
+<h1 align="center">BitStack: Fine-Grained Size Control for Compressed Large Language Models in Variable Memory Environments</h1>
 
 ![BitStack](./assets/bitstack.png)
-## TL;DR
+
+## ✨ TL;DR
 BitStack breaks down large language models into tiny little blocks, which can be sorted and stacked universally, achieving megabyte-level memory-performance tradeoffs while maintaining or surpassing the performance of practical compression methods like GPTQ and AWQ.
 
-## News
+
+## 📰 News
 - [2024-10-31] ✨ Pre-decomposed models are now available on [HuggingFace🤗](https://huggingface.co/BitStack)!
 - [2024-10-31] 🚀 Code release! We have some awesome inference kernels for BitStack models coming soon, stay tuned!
 
-## Quick Start
-### Installation
+## 🚀 Quick Start
+### ⚙️ Installation
 ```
 conda create -yn bitstack python=3.10
 conda activate bitstack
 pip install -e .
 ```
 
-### Decomposition
+### 🔄 Decomposition
 To run the decomposition of a model, run [this script](./scripts/decompose.sh) or the following command:
 ```
 python -m bitstack.main \
@@ -30,7 +36,7 @@ python -m bitstack.main \
     --generate_compression_configs # Generate compression configs
 ```
 
-### Evaluation
+### 📊 Evaluation
 To evaluate the decomposed model, run [this script](./scripts/evaluate.sh) or the following command:
 ```
 python -m bitstack.main \
@@ -42,7 +48,7 @@ python -m bitstack.main \
     --lm_eval \ # Zero-shot evaluation
     --output_dir outputs
 ```
-## Checkpoints
+## 📌 Checkpoints
 We provide pre-decomposed models and compression configs. Currently, the following models are available, with more to come—stay tuned!
 | Model  | Download |
 | :---: | :---: |
@@ -63,5 +69,5 @@ Or just download the compression config for your already decomposed model:
 huggingface-cli download BitStack/BitStack-Llama-3.1-8B --local-dir /YOUR/CHECKPOINT/PATH/ --include "compression_config.json"
 ```
 
-## Citation
+## 📖 Citation
 [TODO]
