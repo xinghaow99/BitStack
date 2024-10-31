@@ -1,13 +1,16 @@
 import argparse
 import torch
+import transformers
 from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM
 from tqdm import tqdm
 from accelerate import (
     init_empty_weights,
     load_checkpoint_and_dispatch,
     infer_auto_device_map,
-    dispatch_model
+    dispatch_model,
 )
+
+import logging
 import os
 import json
 
@@ -29,7 +32,7 @@ from utils.model_utils import (
 from utils.data_utils import get_loaders
 from utils.decompose import decompose
 
-
+logging.getLogger("accelerate.utils.modeling").setLevel(logging.ERROR) # Suppress warnings for partial loading
 
 def check_empty_weights(module, name=''):
     for child_name, child in module.named_children():
@@ -91,6 +94,7 @@ def main():
         check_empty_weights(model)
         # print peak memory usage
         memory = check_module_memory(model)
+        torch.cuda.empty_cache()
         print(f"Memory: {memory//1024**2} MB")
     else:
         model, tokenizer = load_model_and_tokenizer(args.model_name_or_path)

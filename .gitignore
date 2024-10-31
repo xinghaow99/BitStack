@@ -1,5 +1,7 @@
 __pycache__
 logs
 outputs
-scripts
-inference.py
+scripts/reproduction
+tests
+models
+*.egg-info

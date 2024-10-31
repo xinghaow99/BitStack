@@ -46,7 +46,6 @@ class BitStackLinear(nn.Module):
     def decompose_weight(self, original_weight):
         weight = original_weight.to(torch.float32)
         weight_shape = weight.data.shape
-        singular_values = []
         for i in range(self.w_bit):
             weight_sign = weight.sign()
             weight_sign[weight_sign == 0] = 1
@@ -85,17 +84,13 @@ class BitStackLinear(nn.Module):
 
     @torch.no_grad()
     def forward(self, x):
-        if hasattr(self, 'w') and self.w is not None:
-            w = self.w
-        else:
-            w = torch.zeros((self.out_features, self.in_features), dtype=torch.float16, device=x.device)
-            for i in range(self.w_bit):
-                if self.no_avd:
-                    w += compose_weight(None, getattr(self, f'u_{i}'), getattr(self, f'vt_{i}'), self.no_avd, w.shape)
-                else:
-                    w += compose_weight(getattr(self, f'qweight_{i}'), getattr(self, f'u_{i}'), getattr(self, f'vt_{i}'), self.no_avd, w.shape)
+        w = torch.zeros((self.out_features, self.in_features), dtype=torch.float16, device=x.device)
+        for i in range(self.w_bit):
+            if self.no_avd:
+                w += compose_weight(None, getattr(self, f'u_{i}'), getattr(self, f'vt_{i}'), self.no_avd, w.shape)
+            else:
+                w += compose_weight(getattr(self, f'qweight_{i}'), getattr(self, f'u_{i}'), getattr(self, f'vt_{i}'), self.no_avd, w.shape)
         result = x @ w.T
-
         return result
     
     def memory_per_bit(self):
@@ -107,7 +102,7 @@ class BitStackLinear(nn.Module):
         return memory
 
     def pop_one_bit(self):
-        # here we don't really discard the weights
+        # here we don't really discard the weights, only for quick evaluation
         self.w_bit -= 1
     
     def add_one_bit(self):
