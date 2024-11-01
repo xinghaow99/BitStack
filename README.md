@@ -5,7 +5,7 @@
 <h1 align="center">BitStack: Fine-Grained Size Control for Compressed Large Language Models in Variable Memory Environments</h1>
 
 <div align="center">
-<a href="https://arxiv.org/abs/2410.23918" target="_blank"><img src=https://img.shields.io/badge/2410.23918-red?style=plastic&logo=arxiv&logoColor=red&logoSize=auto&label=ArXiv&labelColor=black&color=b31b1b&link=https%3A%2F%2Farxiv.org%2Fabs%2F2410.23918
+<a href="https://arxiv.org/abs/2410.23918" target="_blank"><img src=https://img.shields.io/badge/2410.23918-red?style=plastic&logo=arxiv&logoColor=red&logoSize=auto&label=arXiv&labelColor=black&color=b31b1b&link=https%3A%2F%2Farxiv.org%2Fabs%2F2410.23918
 ></a>
 <a href="https://huggingface.co/datasets/ariya2357/CORAL" target="_blank"><img src=https://img.shields.io/badge/BitStack-yellow?style=plastic&logo=huggingface&logoColor=ffd21e&logoSize=auto&label=HuggingFace&labelColor=black&color=ffd21e&link=https%3A%2F%2Fhuggingface.co%2FBitStack
 ></a>
