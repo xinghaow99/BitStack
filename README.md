@@ -51,7 +51,7 @@ python -m bitstack.main \
     --model_name_or_path /YOUR/CHECKPOINT/PATH \
     --k 16 \
     --max_memory_MB 5541 \ # Maximum available memory for the model
-    --load_compressed \ # Load the decomposed model
+    --load_bitstack \ # Load the decomposed model
     --do_eval \ # Perplexity evaluation
     --lm_eval \ # Zero-shot evaluation
     --output_dir outputs

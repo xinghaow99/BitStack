@@ -2,6 +2,7 @@ __pycache__
 logs
 outputs
 scripts/reproduction
+examples
 tests
 models
 *.egg-info

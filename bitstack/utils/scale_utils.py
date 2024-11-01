@@ -6,8 +6,8 @@ import gc
 import functools
 from tqdm import tqdm
 
-from utils.data_utils import get_loaders
-from modules.BitStackLinear import ScaledActivation
+from bitstack.utils.data_utils import get_loaders
+from bitstack.modules.BitStackLinear import ScaledActivation
 
 def get_op_name(module, op):
     # get the name of the op relative to the module

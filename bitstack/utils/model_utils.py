@@ -3,12 +3,10 @@ import matplotlib.pyplot as plt
 import re
 import torch
 from tqdm import tqdm
-import os
-import json
 
-from modules.BitStackLinear import BitStackLinear
 from accelerate import init_empty_weights, load_checkpoint_and_dispatch
-from utils.decompose import decompose
+from bitstack.modules.BitStackLinear import BitStackLinear
+from bitstack.utils.decompose import decompose
 
 def set_model_bits(model, compression_config):
     # Set bits for each layer as specified in compression_config
@@ -194,7 +192,7 @@ def retrieve_compression_config(configs, max_memory_MB):
             return config['layers']
     raise ValueError(f"No config found within the memory limit {max_memory_MB} MB")
 
-def load_bitstack_model_and_tokenizer(model_name_or_path, niter, k, no_avd, compression_config):
+def load_bitstack_model_and_tokenizer(model_name_or_path, niter=16, k=16, no_avd=False, compression_config=None):
     config = AutoConfig.from_pretrained(model_name_or_path)
     model_name = config._name_or_path.split("/")[-1].split("_")[0]
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)

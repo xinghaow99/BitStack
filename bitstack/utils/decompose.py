@@ -2,8 +2,8 @@ import torch
 import gc
 from tqdm import tqdm
 
-from modules.BitStackLinear import BitStackLinear
-from utils.scale_utils import get_blocks, get_named_linears, set_op_by_name
+from bitstack.modules.BitStackLinear import BitStackLinear
+from bitstack.utils.scale_utils import get_blocks, get_named_linears, set_op_by_name
 @torch.no_grad()
 def decompose(model, wbits, k, signed, init_only=False, compression_config=None):
     layers = get_blocks(model)

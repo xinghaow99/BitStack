@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from utils.pack_utils import pack_sign, unpack_sign
+from bitstack.utils.pack_utils import pack_sign, unpack_sign
 
 def compose_weight(weight_sign, u, vt, no_avd=False, weight_shape=None, packed_sign=True):
     if no_avd:
