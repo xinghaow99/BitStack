@@ -27,7 +27,8 @@ from utils.model_utils import (
     int_or_str,
     load_model_and_tokenizer,
     check_module_memory,
-    retrieve_compression_config
+    retrieve_compression_config,
+    load_bitstack_model_and_tokenizer,
 )
 from utils.data_utils import get_loaders
 from utils.decompose import decompose
@@ -58,7 +59,7 @@ def main():
     parser.add_argument('--eval_dataset', type=str, default='wikitext2')
     parser.add_argument('--no_scale', action='store_false', dest='scale_weight')
     parser.add_argument('--output_dir', type=str, default='outputs')
-    parser.add_argument('--load_compressed', action='store_true')
+    parser.add_argument('--load_bitstack', action='store_true')
     parser.add_argument('--max_memory_MB', type=int, default=None)
     parser.add_argument('--do_eval', action='store_true')
     parser.add_argument('--lm_eval', action='store_true')
@@ -69,33 +70,18 @@ def main():
         default=["piqa", "hellaswag", "arc_easy", "arc_challenge", "winogrande", "lambada_openai", "openbookqa"],
     )
     parser.add_argument('--do_save', action='store_true')
-    parser.add_argument('--save_singular_values', action='store_true')
     parser.add_argument('--score_importance', action='store_true')
     parser.add_argument('--generate_compression_configs', action='store_true')
     parser.set_defaults(scale_weight=True, fuse_scale=True)
     args = parser.parse_args()
 
-    if args.load_compressed:
-        config = AutoConfig.from_pretrained(args.model_name_or_path)
-        model_name = config._name_or_path.split("/")[-1].split("_")[0]
-        # config.use_cache = False
-        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False)
-        print(f"Loading compressed model from {args.model_name_or_path}")
-        with init_empty_weights():
-            model = AutoModelForCausalLM.from_config(config, torch_dtype=torch.float16)
+    if args.load_bitstack:
         compression_config = None
         if args.max_memory_MB is not None:
             with open(os.path.join(args.model_name_or_path, 'compression_config.json'), 'r') as f:
                 compression_configs = json.load(f)
             compression_config = retrieve_compression_config(compression_configs, args.max_memory_MB)
-
-        decompose(model, args.niter, args.k, args.no_avd, init_only=True, compression_config=compression_config)
-        load_checkpoint_and_dispatch(model, args.model_name_or_path, device_map='auto', no_split_module_classes=['LlamaDecoderLayer'])
-        check_empty_weights(model)
-        # print peak memory usage
-        memory = check_module_memory(model)
-        torch.cuda.empty_cache()
-        print(f"Memory: {memory//1024**2} MB")
+        model, tokenizer, model_name = load_bitstack_model_and_tokenizer(args.model_name_or_path, args.niter, args.k, args.no_avd, compression_config)
     else:
         model, tokenizer = load_model_and_tokenizer(args.model_name_or_path)
         model_name = args.model_name_or_path.split("/")[-1]
@@ -109,7 +95,7 @@ def main():
         model.save_pretrained(save_path)
         tokenizer.save_pretrained(save_path)
 
-    if not args.load_compressed:
+    if not args.load_bitstack:
         device_map = infer_auto_device_map(model, no_split_module_classes=['LlamaDecoderLayer'])
         model = dispatch_model(model, device_map=device_map)
 
@@ -134,7 +120,7 @@ def main():
             saved_metrics['lm_eval'] = results
         eval_save_path = os.path.join(args.output_dir, 'evals', model_name, f'bitstack_k_{args.k}_max_memory_{args.max_memory_MB}')
         os.makedirs(eval_save_path, exist_ok=True)
-        if args.load_compressed and compression_config:
+        if args.load_bitstack and compression_config:
             visualize_compression_config(compression_config, save_path=os.path.join(eval_save_path, 'compression_config.png'))
         with open(os.path.join(eval_save_path, 'metrics.json'), 'w') as f:
             json.dump(saved_metrics, f, indent=4)
@@ -162,7 +148,7 @@ def main():
             ppls.append({'bit': bit, 'ppls': bit_ppls})
             # Save after every bit finished
             data = {'original_ppl': original_ppl, 'reduced_ppl': ppls}
-            if args.load_compressed:
+            if args.load_bitstack:
                 reduced_ppl_path = os.path.join(args.model_name_or_path, 'reduced_ppl_average.json')
             else:
                 reduced_ppl_path = os.path.join(args.output_dir, f'{args.model_name_or_path.split("/")[-1]}_niter_{args.niter}_k_{args.k}_no_avd_{args.no_avd}_scaled_{args.scale_weight}', 'reduced_ppl_average.json')
@@ -170,7 +156,7 @@ def main():
                 json.dump(data, f, indent=4)
 
     if args.generate_compression_configs:
-        if args.load_compressed:
+        if args.load_bitstack:
             reduced_ppl_path = os.path.join(args.model_name_or_path, 'reduced_ppl_average.json')
         else:
             reduced_ppl_path = os.path.join(args.output_dir, f'{args.model_name_or_path.split("/")[-1]}_niter_{args.niter}_k_{args.k}_no_avd_{args.no_avd}_scaled_{args.scale_weight}', 'reduced_ppl_average.json')
@@ -182,7 +168,7 @@ def main():
         minimum_memory = sum(memory_per_bit.values())
         total_memory = minimum_memory + extra_memory
         configs = generate_configs(sorted_layer_bits, memory_per_bit, total_memory)
-        if args.load_compressed:
+        if args.load_bitstack:
             save_path = args.model_name_or_path
         with open(os.path.join(save_path, 'compression_config.json'), 'w') as f:
             json.dump(configs, f, indent=4)

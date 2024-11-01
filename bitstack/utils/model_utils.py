@@ -3,8 +3,12 @@ import matplotlib.pyplot as plt
 import re
 import torch
 from tqdm import tqdm
-import random
+import os
+import json
+
 from modules.BitStackLinear import BitStackLinear
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+from utils.decompose import decompose
 
 def set_model_bits(model, compression_config):
     # Set bits for each layer as specified in compression_config
@@ -189,3 +193,19 @@ def retrieve_compression_config(configs, max_memory_MB):
             # print(f"Config with memory {config['memory']//1024**2} MB found")
             return config['layers']
     raise ValueError(f"No config found within the memory limit {max_memory_MB} MB")
+
+def load_bitstack_model_and_tokenizer(model_name_or_path, niter, k, no_avd, compression_config):
+    config = AutoConfig.from_pretrained(model_name_or_path)
+    model_name = config._name_or_path.split("/")[-1].split("_")[0]
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
+    print(f"Loading decomposed model from {model_name_or_path}")
+    with init_empty_weights():
+        model = AutoModelForCausalLM.from_config(config, torch_dtype=torch.float16)
+    assert not (niter is None and compression_config is None)
+    decompose(model, niter, k, no_avd, init_only=True, compression_config=compression_config)
+    load_checkpoint_and_dispatch(model, model_name_or_path, device_map='auto', no_split_module_classes=['LlamaDecoderLayer'])
+    # print memory usage
+    memory = check_module_memory(model)
+    torch.cuda.empty_cache()
+    print(f"Memory: {memory//1024**2} MB")
+    return model, tokenizer, model_name
