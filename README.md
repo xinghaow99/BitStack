@@ -4,13 +4,21 @@
 
 <h1 align="center">BitStack: Fine-Grained Size Control for Compressed Large Language Models in Variable Memory Environments</h1>
 
+<div align="center">
+<a href="https://arxiv.org/abs/2410.23918" target="_blank"><img src=https://img.shields.io/badge/2410.23918-red?style=plastic&logo=arxiv&logoColor=red&logoSize=auto&label=ArXiv&labelColor=black&color=b31b1b&link=https%3A%2F%2Farxiv.org%2Fabs%2F2410.23918
+></a>
+<a href="https://huggingface.co/datasets/ariya2357/CORAL" target="_blank"><img src=https://img.shields.io/badge/BitStack-yellow?style=plastic&logo=huggingface&logoColor=ffd21e&logoSize=auto&label=HuggingFace&labelColor=black&color=ffd21e&link=https%3A%2F%2Fhuggingface.co%2FBitStack
+></a>
+</div>
+
 ![BitStack](./assets/bitstack.png)
 
 ## ✨ TL;DR
-BitStack breaks down large language models into tiny little blocks, which can be sorted and stacked universally, achieving megabyte-level memory-performance tradeoffs while maintaining or surpassing the performance of practical compression methods like GPTQ and AWQ.
+BitStack breaks down large language models into tiny little blocks, which can be sorted and stacked universally, achieving megabyte-level memory-performance tradeoffs while maintaining or surpassing the performance of practical compression methods like GPTQ and AWQ. Check out [our paper](https://arxiv.org/abs/2410.23918) for more details!
 
 
 ## 📰 News
+- [2024-11-01] 📄 Check out our paper on [ArXiv](https://arxiv.org/abs/2410.23918)!
 - [2024-10-31] ✨ Pre-decomposed models are now available on [HuggingFace🤗](https://huggingface.co/BitStack)!
 - [2024-10-31] 🚀 Code release! We have some awesome inference kernels for BitStack models coming soon, stay tuned!
 
@@ -70,4 +78,14 @@ huggingface-cli download BitStack/BitStack-Llama-3.1-8B --local-dir /YOUR/CHECKP
 ```
 
 ## 📖 Citation
-[TODO]
+```
+@misc{wang2024bitstackfinegrainedsizecontrol,
+      title={BitStack: Fine-Grained Size Control for Compressed Large Language Models in Variable Memory Environments}, 
+      author={Xinghao Wang and Pengyu Wang and Bo Wang and Dong Zhang and Yunhua Zhou and Xipeng Qiu},
+      year={2024},
+      eprint={2410.23918},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2410.23918}, 
+}
+```
