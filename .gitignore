@@ -2,6 +2,8 @@ __pycache__
 logs
 outputs
 scripts
+models
+*.egg-info
 inference.py
 kernel.py
 quantize_packed.py
