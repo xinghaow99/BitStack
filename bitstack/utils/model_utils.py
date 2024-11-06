@@ -3,8 +3,10 @@ import matplotlib.pyplot as plt
 import re
 import torch
 from tqdm import tqdm
-import random
-from modules.BitStackLinear import BitStackLinear
+
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+from bitstack.modules.BitStackLinear import BitStackLinear
+from bitstack.utils.decompose import decompose
 
 def set_model_bits(model, compression_config):
     # Set bits for each layer as specified in compression_config
@@ -190,7 +192,28 @@ def retrieve_compression_config(configs, max_memory_MB):
             return config['layers']
     raise ValueError(f"No config found within the memory limit {max_memory_MB} MB")
 
-def prepare_for_parallel_forward(model):
+def load_bitstack_model_and_tokenizer(model_name_or_path, niter=16, k=16, no_avd=False, fused_level=0, compression_config=None):
+    config = AutoConfig.from_pretrained(model_name_or_path)
+    model_name = config._name_or_path.split("/")[-1].split("_")[0]
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
+    print(f"Loading decomposed model from {model_name_or_path}")
+    with init_empty_weights():
+        model = AutoModelForCausalLM.from_config(config, torch_dtype=torch.float16)
+    assert not (niter is None and compression_config is None)
+    decompose(model, niter, k, no_avd, fused_level, init_only=True, compression_config=compression_config)
+    load_checkpoint_and_dispatch(model, model_name_or_path, device_map='auto', no_split_module_classes=['LlamaDecoderLayer'])
+    # print memory usage
+    memory = check_module_memory(model)
+    torch.cuda.empty_cache()
+    print(f"Memory: {memory//1024**2} MB")
+    return model, tokenizer, model_name
+
+def prepare_for_fused_forward(model):
     for name, module in model.named_modules():
         if isinstance(module, BitStackLinear):
             module.stack_blocks()
+
+def prepare_for_saving(model):
+    for name, module in model.named_modules():
+        if isinstance(module, BitStackLinear):
+            module.prepare_for_saving()

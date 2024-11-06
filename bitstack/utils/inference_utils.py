@@ -3,7 +3,7 @@ import torch
 import triton
 import triton.language as tl
 
-from utils.pack_utils import pack_sign
+from bitstack.utils.pack_utils import pack_sign
 
 def get_cuda_autotune_config():
 
@@ -133,18 +133,17 @@ def reconstruct_w_triton(sign, u, vt):
     return output
 
 
-
-
-
-# @triton.autotune(
-#     configs=[
-#         triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 16}, num_stages=2, num_warps=4),
-#         triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 16}, num_stages=3, num_warps=8),
-#         triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 16}, num_stages=3, num_warps=8),
-#         # Add more configurations as needed
-#     ],
-#     key=['N_ITER', 'M', 'N', 'K'],
-# )
+@triton.autotune(
+    configs=[
+        triton.Config({'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 16}, num_stages=2, num_warps=4),
+        triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 16}, num_stages=2, num_warps=4),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 16}, num_stages=3, num_warps=8),
+        triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 16}, num_stages=3, num_warps=8),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 16}, num_stages=4, num_warps=8),
+        
+    ],
+    key=['N_ITER', 'M', 'N', 'K'],
+)
 @triton.jit
 def fused_reconstruct_and_forward_kernel(
     sign_ptr, u_ptr, vt_ptr, output_ptr,
@@ -247,11 +246,7 @@ def reconstruct_and_forward_triton(sign, u, vt, x):
         triton.cdiv(M, META['BLOCK_SIZE_M']),
         BZ * L
     )
-    BLOCK_SIZE_M = 64
-    BLOCK_SIZE_N = 64
-    BLOCK_SIZE_K = 16
-    NUM_WARPS = 8
-    NUM_STAGES = 2
+
     fused_reconstruct_and_forward_kernel[grid](
         sign, u, vt, output,
         x,
@@ -262,8 +257,6 @@ def reconstruct_and_forward_triton(sign, u, vt, x):
         vt.stride(0), vt.stride(1), vt.stride(2),
         x.stride(0), x.stride(1), x.stride(2),
         output.stride(0), output.stride(1), output.stride(2),
-        BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K,
-        NUM_WARPS, NUM_STAGES
     )
     return output
 
@@ -343,7 +336,6 @@ def fused_unpack_and_reconstruct_kernel(
             iter_acc += tl.dot(u, vt, out_dtype=tl.float32)
 
         acc += signs * iter_acc
-        # acc += tl.where(signs == 1, iter_acc, -iter_acc)
 
     output = acc.to(tl.float16)
 
@@ -411,24 +403,13 @@ def fused_unpack_and_reconstruct_kernel_v2(
     offsets_k = tl.arange(0, BLOCK_SIZE_K)
 
     # Unpack signs
-    # PACKED_BLOCK_SIZE_N: tl.constexpr = BLOCK_SIZE_N // 8
-
-    # offsets_n_packed = pid_n * PACKED_BLOCK_SIZE_N + tl.arange(0, PACKED_BLOCK_SIZE_N)
-    # packed_sign_ptrs = packed_sign_ptr + (
-    #     pid_iter * stride_packed_sign_iter +
-    #     offsets_m * stride_packed_sign_m +
-    #     offsets_n_packed * stride_packed_sign_n
-    # )
-    # packed_bytes = tl.load(packed_sign_ptrs)
-    # bit_offsets = tl.arange(0, 8) # Shape: (8,)
-    # packed_bytes = packed_bytes[:, :, None] # Shape: (BLOCK_SIZE_M, PACKED_BLOCK_SIZE_N, 1)
-    
     element_indices = pid_iter * M * N + offsets_m * N + offsets_n
     element_indices = tl.reshape(element_indices, (BLOCK_SIZE_M * BLOCK_SIZE_N,))
     byte_indices = element_indices // 8
     bit_indices = element_indices % 8
     byte_ptrs = packed_sign_ptr + byte_indices
     byte_mask = byte_indices < ((n_sign_elements + 7) // 8)
+
     packed_bytes = tl.load(byte_ptrs, mask=byte_mask, other=0)
     
     bits = (packed_bytes >> (7 - bit_indices)) & 1 # Shape: (BLOCK_SIZE_M, PACKED_BLOCK_SIZE_N, 8)
@@ -448,11 +429,6 @@ def fused_unpack_and_reconstruct_kernel_v2(
 
         iter_acc += tl.dot(u, vt, out_dtype=tl.float32)
 
-    
-    # Apply signs with proper masking
-    # iter_acc = signs * iter_acc
-    
-    # Convert to output dtype
     output = (signs * iter_acc).to(tl.float16)
     
     offsets_output_m = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
@@ -559,11 +535,6 @@ def fused_unpack_and_reconstruct_kernel_v3(
 
         iter_acc += tl.dot(u, vt, out_dtype=tl.float32)
 
-    
-    # Apply signs with proper masking
-    # iter_acc = signs * iter_acc
-    
-    # Convert to output dtype
     output = (signs * iter_acc).to(tl.float16)
     
     offsets_output_m = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)

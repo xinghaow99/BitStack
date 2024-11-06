@@ -1,8 +1,10 @@
 __pycache__
+.cache
 logs
 outputs
-scripts
+scripts/reproduction
 models
+tests
 *.egg-info
 inference.py
 kernel.py
