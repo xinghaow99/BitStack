@@ -9,6 +9,7 @@ from accelerate import (
     infer_auto_device_map,
     dispatch_model,
 )
+from accelerate.utils.modeling import get_balanced_memory
 
 import logging
 import os
@@ -97,15 +98,16 @@ def main():
     
     save_path = os.path.join(args.output_dir, f'{args.model_name_or_path.split("/")[-1]}_niter_{args.niter}_k_{args.k}_no_avd_{args.no_avd}_scaled_{args.scale_weight}')
     if args.do_save:
+        assert not args.load_bitstack
         model.save_pretrained(save_path)
         tokenizer.save_pretrained(save_path)
 
     if not args.load_bitstack:
-        device_map = infer_auto_device_map(model, no_split_module_classes=['LlamaDecoderLayer'])
+        max_memory = get_balanced_memory(model, no_split_module_classes=['LlamaDecoderLayer'])
+        device_map = infer_auto_device_map(model, max_memory, no_split_module_classes=['LlamaDecoderLayer'])
         model = dispatch_model(model, device_map=device_map)
-
-    if args.fused_level > 0:
-        prepare_for_fused_forward(model)
+        if args.fused_level > 0:
+            prepare_for_fused_forward(model)
 
     if args.do_eval:
         saved_metrics = {}

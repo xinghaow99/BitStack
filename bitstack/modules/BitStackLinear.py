@@ -42,7 +42,6 @@ class BitStackLinear(nn.Module):
             if bias:
                 self.register_buffer(f'bias_{i}', torch.zeros(out_features, dtype=torch.float16))
 
-        self.name = None
     
     def decompose_weight(self, original_weight):
         weight = original_weight.to(torch.float32)

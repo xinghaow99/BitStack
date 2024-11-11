@@ -87,6 +87,7 @@ def unpack_sign_v2(packed: torch.Tensor, original_shape: torch.Size) -> torch.Te
         triton.Config({'BLOCK_SIZE': 256, 'PACKED_BLOCK_SIZE': 32}),
         triton.Config({'BLOCK_SIZE': 512, 'PACKED_BLOCK_SIZE': 64}),
         triton.Config({'BLOCK_SIZE': 1024, 'PACKED_BLOCK_SIZE': 128}),
+        triton.Config({'BLOCK_SIZE': 2048, 'PACKED_BLOCK_SIZE': 256}),
     ],
     key=['n_elements'],
 )
@@ -137,16 +138,84 @@ def unpack_sign_kernel(
     tl.store(unpacked_ptr + element_offsets, signs.to(tl.float16), mask=mask)
 
 
-def unpack_sign_triton(packed, original_shape):
+# def unpack_sign_triton(packed, original_shape, max_chunk_size=2**30):
+#     n_elements = original_shape.numel()
+#     # unpacked = torch.empty(original_shape, dtype=torch.int8, device=packed.device)
+#     unpacked = torch.empty(n_elements, dtype=torch.int8, device=packed.device) 
+#     n_elements_per_iter = n_elements // packed.shape[0]
+#     chunk_num = 8
+#     if n_elements > max_chunk_size:
+#         chunk_size_dim_0 = packed.shape[0] // chunk_num
+#         for i in range(chunk_num):
+#             start = i * chunk_size_dim_0
+#             end = min((i + 1) * chunk_size_dim_0, packed.shape[0])
+#             unpacked_start = start * n_elements_per_iter
+#             unpacked_end = end * n_elements_per_iter
+#             grid = lambda meta: (triton.cdiv(unpacked[unpacked_start: unpacked_end].numel(), meta['BLOCK_SIZE']),)
+#             with torch.cuda.device(packed.device):
+#                 unpack_sign_kernel[grid](
+#                     packed[start: end], unpacked[unpacked_start: unpacked_end],
+#                     packed[start: end].numel()*8,
+#             )
+#             # grid = lambda meta: (triton.cdiv(unpacked[start: end].numel(), meta['BLOCK_SIZE']),)
+#             # with torch.cuda.device(packed.device):
+#             #     unpack_sign_kernel[grid](
+#             #         packed[start: end], unpacked[start: end],
+#             #         packed[start: end].numel()*8,
+#             #     )
+#     else:
+#         grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
+#         with torch.cuda.device(packed.device):
+#             unpack_sign_kernel[grid](
+#                 packed, unpacked,
+#                 n_elements,
+#             )
+
+#     unpacked = unpacked.view(original_shape)
+#     return unpacked
+
+def unpack_sign_triton(packed, original_shape, max_chunk_size=2**30):
     n_elements = original_shape.numel()
-    unpacked = torch.empty(n_elements, dtype=torch.int8, device=packed.device)
-
-    grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
-
-    unpack_sign_kernel[grid](
-        packed, unpacked,
-        n_elements,
-    )
+    unpacked = torch.empty(n_elements, dtype=torch.int8, device=packed.device) 
+    n_elements_per_iter = n_elements // packed.shape[0]
+    chunk_num = 2
+    if n_elements > max_chunk_size:
+        chunk_size_dim_0 = packed.shape[0] // chunk_num
+        for i in range(chunk_num):
+            start = i * chunk_size_dim_0
+            end = min((i + 1) * chunk_size_dim_0, packed.shape[0])
+            unpacked_start = start * n_elements_per_iter
+            unpacked_end = end * n_elements_per_iter
+            grid = lambda meta: (triton.cdiv(unpacked[unpacked_start: unpacked_end].numel(), meta['BLOCK_SIZE']),)
+            with torch.cuda.device(packed.device):
+                unpack_sign_kernel[grid](
+                    packed[start: end], unpacked[unpacked_start: unpacked_end],
+                    packed[start: end].numel()*8,
+            )
+    else:
+        grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
+        with torch.cuda.device(packed.device):
+            unpack_sign_kernel[grid](
+                packed, unpacked,
+                n_elements,
+            )
 
     unpacked = unpacked.view(original_shape)
     return unpacked
+    
+# def unpack_sign_triton(packed, original_shape, max_chunk_size=2**30):
+#     n_elements = original_shape.numel()
+#     unpacked = torch.empty(original_shape, dtype=torch.int8, device=packed.device)
+
+#     if n_elements > max_chunk_size:
+#         mid = packed.shape[0] // 2
+#         unpacked[:mid] = unpack_sign_triton(packed[:mid], torch.Size([mid, original_shape[1], original_shape[2]]), max_chunk_size)
+#         unpacked[mid:] = unpack_sign_triton(packed[mid:], torch.Size([original_shape[0]-mid, original_shape[1], original_shape[2]]), max_chunk_size)
+#     else:
+#         grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
+#         with torch.cuda.device(packed.device):
+#             unpack_sign_kernel[grid](
+#                 packed, unpacked,
+#                 n_elements,
+#             )
+#     return unpacked

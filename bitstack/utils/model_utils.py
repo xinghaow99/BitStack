@@ -206,9 +206,12 @@ def load_bitstack_model_and_tokenizer(model_name_or_path, niter=16, k=16, no_avd
     memory = check_module_memory(model)
     torch.cuda.empty_cache()
     print(f"Memory: {memory//1024**2} MB")
+    if fused_level > 0:
+        prepare_for_fused_forward(model)
     return model, tokenizer, model_name
 
 def prepare_for_fused_forward(model):
+    print("Preparing for fused forward")
     for name, module in model.named_modules():
         if isinstance(module, BitStackLinear):
             module.stack_blocks()

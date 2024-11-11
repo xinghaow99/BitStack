@@ -115,22 +115,45 @@ def fused_reconstruct_kernel(
     tl.store(output_ptrs, output, mask=output_mask)
 
 
-def reconstruct_w_triton(sign, u, vt):
-    # This implements the fused computation for (sign * u @ vt).sum(dim=0)
-    N_ITER, M, N = sign.shape
-    K = u.shape[-1]
-    output = torch.empty((M, N), device=u.device, dtype=torch.float16)
-    grid = lambda META: (triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']), )
-    fused_reconstruct_kernel[grid](
-        sign, u, vt, output,
-        N_ITER, M, N, K,
-        sign.stride(0), sign.stride(1), sign.stride(2),
-        u.stride(0), u.stride(1), u.stride(2),
-        vt.stride(0), vt.stride(1), vt.stride(2),
-        output.stride(0), output.stride(1),
+# def reconstruct_w_triton(sign, u, vt):
+#     # This implements the fused computation for (sign * u @ vt).sum(dim=0)
+#     N_ITER, M, N = sign.shape
+#     K = u.shape[-1]
+#     output = torch.empty((M, N), device=u.device, dtype=torch.float16)
+#     grid = lambda META: (triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']), )
+#     with torch.cuda.device(sign.device):
+#         fused_reconstruct_kernel[grid](
+#             sign, u, vt, output,
+#             N_ITER, M, N, K,
+#             sign.stride(0), sign.stride(1), sign.stride(2),
+#             u.stride(0), u.stride(1), u.stride(2),
+#             vt.stride(0), vt.stride(1), vt.stride(2),
+#             output.stride(0), output.stride(1),
+#         )
+#     return output
 
-    )
-    return output
+def reconstruct_w_triton(sign, u, vt):
+    if sign.numel() > 2**31:
+        N_ITER = sign.shape[0]
+        mid = N_ITER // 2
+        output1 = reconstruct_w_triton(sign[:mid], u[:mid], vt[:mid])
+        output2 = reconstruct_w_triton(sign[mid:], u[mid:],  vt[mid:])
+        return output1 + output2
+    else:
+        N_ITER, M, N = sign.shape
+        K = u.shape[-1]
+        output = torch.empty((M, N), device=u.device, dtype=torch.float16)
+        grid = lambda META: (triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']), )
+        with torch.cuda.device(sign.device):
+            fused_reconstruct_kernel[grid](
+                sign, u, vt, output,
+                N_ITER, M, N, K,
+                sign.stride(0), sign.stride(1), sign.stride(2),
+                u.stride(0), u.stride(1), u.stride(2),
+                vt.stride(0), vt.stride(1), vt.stride(2),
+                output.stride(0), output.stride(1),
+            )
+        return output
 
 
 @triton.autotune(
@@ -246,18 +269,18 @@ def reconstruct_and_forward_triton(sign, u, vt, x):
         triton.cdiv(M, META['BLOCK_SIZE_M']),
         BZ * L
     )
-
-    fused_reconstruct_and_forward_kernel[grid](
-        sign, u, vt, output,
-        x,
-        N_ITER, M, N, K,
-        BZ, L,
-        sign.stride(0), sign.stride(1), sign.stride(2),
-        u.stride(0), u.stride(1), u.stride(2),
-        vt.stride(0), vt.stride(1), vt.stride(2),
-        x.stride(0), x.stride(1), x.stride(2),
-        output.stride(0), output.stride(1), output.stride(2),
-    )
+    with torch.cuda.device(sign.device):
+        fused_reconstruct_and_forward_kernel[grid](
+            sign, u, vt, output,
+            x,
+            N_ITER, M, N, K,
+            BZ, L,
+            sign.stride(0), sign.stride(1), sign.stride(2),
+            u.stride(0), u.stride(1), u.stride(2),
+            vt.stride(0), vt.stride(1), vt.stride(2),
+            x.stride(0), x.stride(1), x.stride(2),
+            output.stride(0), output.stride(1), output.stride(2),
+        )
     return output
 
 @triton.autotune(
@@ -352,15 +375,15 @@ def unpack_and_reconstruct_w_triton(packed_sign, u, vt):
     output = torch.empty((M, N), device=u.device, dtype=torch.float16)
     n_sign_elements = N_ITER * M * N
     grid = lambda META: (triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']), )
-    fused_unpack_and_reconstruct_kernel[grid](
-        packed_sign, u, vt, output,
-        N_ITER, M, N, K,
-        n_sign_elements,
-        u.stride(0), u.stride(1), u.stride(2),
-        vt.stride(0), vt.stride(1), vt.stride(2),
-        output.stride(0), output.stride(1),
-
-    )
+    with torch.cuda.device(packed_sign.device):
+        fused_unpack_and_reconstruct_kernel[grid](
+            packed_sign, u, vt, output,
+            N_ITER, M, N, K,
+            n_sign_elements,
+            u.stride(0), u.stride(1), u.stride(2),
+            vt.stride(0), vt.stride(1), vt.stride(2),
+            output.stride(0), output.stride(1),
+        )
     return output
 
 @triton.autotune(
@@ -451,17 +474,17 @@ def unpack_and_reconstruct_w_triton_v2(packed_sign, u, vt):
         triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']),
         N_ITER,
     )
+    with torch.cuda.device(packed_sign.device):
+        fused_unpack_and_reconstruct_kernel_v2[grid](
+            packed_sign, u, vt, output,
+            N_ITER, M, N, K,
+            n_sign_elements,
+            packed_sign.stride(0), packed_sign.stride(1), packed_sign.stride(2),
+            u.stride(0), u.stride(1), u.stride(2),
+            vt.stride(0), vt.stride(1), vt.stride(2),
+            output.stride(0), output.stride(1),
 
-    fused_unpack_and_reconstruct_kernel_v2[grid](
-        packed_sign, u, vt, output,
-        N_ITER, M, N, K,
-        n_sign_elements,
-        packed_sign.stride(0), packed_sign.stride(1), packed_sign.stride(2),
-        u.stride(0), u.stride(1), u.stride(2),
-        vt.stride(0), vt.stride(1), vt.stride(2),
-        output.stride(0), output.stride(1),
-
-    )
+        )
     return output
 
 
@@ -557,17 +580,17 @@ def unpack_and_reconstruct_w_triton_v3(packed_sign, u, vt):
         triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']),
         N_ITER,
     )
+    with torch.cuda.device(packed_sign.device):
+        fused_unpack_and_reconstruct_kernel_v3[grid](
+            packed_sign, u, vt, output,
+            N_ITER, M, N, K,
+            n_sign_elements,
+            packed_sign.stride(0), packed_sign.stride(1), packed_sign.stride(2),
+            u.stride(0), u.stride(1), u.stride(2),
+            vt.stride(0), vt.stride(1), vt.stride(2),
+            output.stride(0), output.stride(1), output.stride(2),
 
-    fused_unpack_and_reconstruct_kernel_v3[grid](
-        packed_sign, u, vt, output,
-        N_ITER, M, N, K,
-        n_sign_elements,
-        packed_sign.stride(0), packed_sign.stride(1), packed_sign.stride(2),
-        u.stride(0), u.stride(1), u.stride(2),
-        vt.stride(0), vt.stride(1), vt.stride(2),
-        output.stride(0), output.stride(1), output.stride(2),
-
-    )
+        )
     output = output.sum(dim=0)
     return output
 
