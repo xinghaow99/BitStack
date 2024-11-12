@@ -59,7 +59,7 @@ def main():
     parser.add_argument('--niter', type=int, default=1)
     parser.add_argument('--no_avd', action='store_true')
     parser.add_argument('--no_fuse_scale', action='store_false', dest='fuse_scale')
-    parser.add_argument('--fused_level', type=int, default=2)
+    parser.add_argument('--fused_level', type=int, default=0)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--eval_dataset', type=str, default='wikitext2')
     parser.add_argument('--no_scale', action='store_false', dest='scale_weight')
