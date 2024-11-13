@@ -115,8 +115,8 @@ class BitStackLinear(nn.Module):
         # Forward for fused_level == 1
         # This level unpack sign matrices with a triton kernel and stack the blocks for parallel computation
         assert not self.no_avd # no_avd is only for ablation study
-        unpacked_sign = unpack_sign_triton(self.qweight.view(-1), torch.Size([self.w_bit, self.out_features, self.in_features]))
-        w = torch.matmul(self.u, self.vt)
+        unpacked_sign = unpack_sign_triton(self.qweight[:self.w_bit].view(-1), torch.Size([self.w_bit, self.out_features, self.in_features]))
+        w = torch.matmul(self.u[:self.w_bit], self.vt[:self.w_bit])
         w = (w.mul_(unpacked_sign)).sum(dim=0).contiguous()
         return F.linear(x, w, bias=None)
     
@@ -124,8 +124,8 @@ class BitStackLinear(nn.Module):
     def forward_l2(self, x):
         # Forward for fused_level == 2
         # This level unpack sign matrices and reconstruct the weight matrices with seperate triton kernels
-        unpacked_sign = unpack_sign_triton(self.qweight.view(-1), torch.Size([self.w_bit, self.out_features, self.in_features]))
-        w = reconstruct_w_triton(unpacked_sign, self.u, self.vt)
+        unpacked_sign = unpack_sign_triton(self.qweight[:self.w_bit].view(-1), torch.Size([self.w_bit, self.out_features, self.in_features]))
+        w = reconstruct_w_triton(unpacked_sign, self.u[:self.w_bit], self.vt[:self.w_bit])
         return F.linear(x, w, bias=None)
     
     @torch.no_grad()
@@ -133,7 +133,7 @@ class BitStackLinear(nn.Module):
         # Forward for fused_level == 3
         # This level fuses the unpacking and reconstruction in triton kernels
         # The N_ITER dimension is processed sequentially
-        w = unpack_and_reconstruct_w_triton(self.qweight, self.u, self.vt)
+        w = unpack_and_reconstruct_w_triton(self.qweight[:self.w_bit], self.u[:self.w_bit], self.vt[:self.w_bit])
         return F.linear(x, w, bias=None)
     
     @torch.no_grad()
@@ -141,15 +141,15 @@ class BitStackLinear(nn.Module):
         # Forward for fused_level == 4
         # This level fuses the unpacking and reconstruction in triton kernels
         # The N_ITER dimension is processed in parallel
-        w = unpack_and_reconstruct_w_triton_v2(self.qweight, self.u, self.vt)
+        w = unpack_and_reconstruct_w_triton_v2(self.qweight[:self.w_bit], self.u[:self.w_bit], self.vt[:self.w_bit])
         return F.linear(x, w, bias=None)
     
     @torch.no_grad()
     def forward_l5(self, x):
         # Forward for fused_level == 5
         # This level fuses the reconstruction and forward computation in triton kernels
-        unpacked_sign = unpack_sign_triton(self.qweight.view(-1), torch.Size([self.w_bit, self.out_features, self.in_features]))
-        result = reconstruct_and_forward_triton(unpacked_sign, self.u, self.vt, x)
+        unpacked_sign = unpack_sign_triton(self.qweight[:self.w_bit].view(-1), torch.Size([self.w_bit, self.out_features, self.in_features]))
+        result = reconstruct_and_forward_triton(unpacked_sign, self.u[:self.w_bit], self.vt[:self.w_bit], x)
         return result
 
     def memory_per_bit(self):
