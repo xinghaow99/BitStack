@@ -18,7 +18,9 @@ dependencies = [
     "lm_eval==0.4.5",
     "tqdm",
     "matplotlib",
-    "gradio"
+    "gradio",
+    "sentencepiece",
+    "protobuf"
 ]
 [tool.setuptools.packages.find]
 where = ["bitstack"]
