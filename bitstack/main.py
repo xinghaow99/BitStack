@@ -57,6 +57,8 @@ def main():
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--k', type=int, default=1)
     parser.add_argument('--niter', type=int, default=1)
+    parser.add_argument('--decomposed_modules', nargs='+', default=['q_proj', 'k_proj', 'v_proj', 'o_proj', 'gate_proj', 'down_proj', 'up_proj'])
+    parser.add_argument('--no_split_module_classes', nargs='+', default=['LlamaDecoderLayer'])
     parser.add_argument('--no_avd', action='store_true')
     parser.add_argument('--no_fuse_scale', action='store_false', dest='fuse_scale')
     parser.add_argument('--fused_level', type=int, default=0)
@@ -86,7 +88,7 @@ def main():
             with open(os.path.join(args.model_name_or_path, 'compression_config.json'), 'r') as f:
                 compression_configs = json.load(f)
             compression_config = retrieve_compression_config(compression_configs, args.max_memory_MB)
-        model, tokenizer, model_name = load_bitstack_model_and_tokenizer(args.model_name_or_path, args.niter, args.k, args.no_avd, args.fused_level, compression_config)
+        model, tokenizer, model_name = load_bitstack_model_and_tokenizer(args.model_name_or_path, args.niter, args.k, args.no_avd, args.no_split_module_classes, args.fused_level, compression_config)
     else:
         model, tokenizer = load_model_and_tokenizer(args.model_name_or_path)
         model_name = args.model_name_or_path.split("/")[-1]
@@ -103,8 +105,8 @@ def main():
         tokenizer.save_pretrained(save_path)
 
     if not args.load_bitstack:
-        max_memory = get_balanced_memory(model, no_split_module_classes=['LlamaDecoderLayer'])
-        device_map = infer_auto_device_map(model, max_memory, no_split_module_classes=['LlamaDecoderLayer'])
+        max_memory = get_balanced_memory(model, no_split_module_classes=args.no_split_module_classes)
+        device_map = infer_auto_device_map(model, max_memory, no_split_module_classes=args.no_split_module_classes)
         model = dispatch_model(model, device_map=device_map)
         if args.fused_level > 0:
             prepare_for_fused_forward(model)
@@ -130,8 +132,6 @@ def main():
             saved_metrics['lm_eval'] = results
         eval_save_path = os.path.join(args.output_dir, 'evals', model_name, f'bitstack_k_{args.k}_max_memory_{args.max_memory_MB}')
         os.makedirs(eval_save_path, exist_ok=True)
-        if args.load_bitstack and compression_config:
-            visualize_compression_config(compression_config, save_path=os.path.join(eval_save_path, 'compression_config.png'))
         with open(os.path.join(eval_save_path, 'metrics.json'), 'w') as f:
             json.dump(saved_metrics, f, indent=4)
 
@@ -173,7 +173,7 @@ def main():
         with open(reduced_ppl_path, 'r') as f:
             reduced_ppls = json.load(f)
         sorted_layer_bits = sort_layers_and_bits_average(reduced_ppls)
-        extra_memory = check_model_memory_excluding_linear(model)
+        extra_memory = check_model_memory_excluding_linear(model, args.decomposed_modules)
         memory_per_bit = calculate_memory_per_bit(model)
         minimum_memory = sum(memory_per_bit.values())
         total_memory = minimum_memory + extra_memory

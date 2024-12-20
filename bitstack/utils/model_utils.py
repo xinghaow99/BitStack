@@ -23,20 +23,6 @@ def calculate_memory_per_bit(model):
             memory_per_bit[module.name] = module.memory_per_bit()
     return memory_per_bit
 
-def check_model_memory_excluding_linear(model):
-    total_memory = 0
-    exclude_modules = ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'gate_proj', 'down_proj', 'up_proj']
-    for name, p in model.named_parameters():
-        if any(exclude in name for exclude in exclude_modules):
-            continue
-        total_memory += p.numel() * p.element_size()
-    for name, b in model.named_buffers():
-        if any(exclude in name for exclude in exclude_modules):
-            continue
-        total_memory += b.numel() * b.element_size()
-
-    return total_memory
-
 def sort_layers_and_bits_average(data):
     bits = data['reduced_ppl']
     max_bit = len(bits)
@@ -146,15 +132,14 @@ def eval_ppl(batch_size, seqlen, model, input_ids, disable_tqdm=False):
     ppl = torch.exp(nll_tensor.mean())
     return ppl.item()
 
-def check_model_memory_excluding_linear(model):
+def check_model_memory_excluding_linear(model, decomposed_modules):
     total_memory = 0
-    exclude_modules = ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'gate_proj', 'down_proj', 'up_proj']
     for name, p in model.named_parameters():
-        if any(exclude in name for exclude in exclude_modules):
+        if any(exclude in name for exclude in decomposed_modules):
             continue
         total_memory += p.numel() * p.element_size()
     for name, b in model.named_buffers():
-        if any(exclude in name for exclude in exclude_modules):
+        if any(exclude in name for exclude in decomposed_modules):
             continue
         total_memory += b.numel() * b.element_size()
 
@@ -192,7 +177,7 @@ def retrieve_compression_config(configs, max_memory_MB):
             return config['layers']
     raise ValueError(f"No config found within the memory limit {max_memory_MB} MB")
 
-def load_bitstack_model_and_tokenizer(model_name_or_path, niter=16, k=16, no_avd=False, fused_level=0, compression_config=None):
+def load_bitstack_model_and_tokenizer(model_name_or_path, niter=16, k=16, no_avd=False, no_split_module_classes=['LlamaDecoderLayer'], fused_level=0, compression_config=None):
     config = AutoConfig.from_pretrained(model_name_or_path)
     model_name = config._name_or_path.split("/")[-1].split("_")[0]
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
@@ -201,7 +186,7 @@ def load_bitstack_model_and_tokenizer(model_name_or_path, niter=16, k=16, no_avd
         model = AutoModelForCausalLM.from_config(config, torch_dtype=torch.float16)
     assert not (niter is None and compression_config is None)
     decompose(model, niter, k, no_avd, fused_level, init_only=True, compression_config=compression_config)
-    load_checkpoint_and_dispatch(model, model_name_or_path, device_map='auto', no_split_module_classes=['LlamaDecoderLayer'])
+    load_checkpoint_and_dispatch(model, model_name_or_path, device_map='auto', no_split_module_classes=no_split_module_classes)
     # print memory usage
     memory = check_module_memory(model)
     torch.cuda.empty_cache()
