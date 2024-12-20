@@ -62,9 +62,12 @@ python -m bitstack.main \
 We provide pre-decomposed models and compression configs. Currently, the following models are available, with more to come—stay tuned!
 | Model  | Download |
 | :---: | :---: |
-| Llama-3.1 | [🤗8B](https://huggingface.co/BitStack/BitStack-Llama-3.1-8B) / [🤗70B](https://huggingface.co/BitStack/BitStack-Llama-3.1-70B) |
-| Llama-3 | [🤗8B](https://huggingface.co/BitStack/BitStack-Llama-3-8B) / [🤗70B](https://huggingface.co/BitStack/BitStack-Llama-3-70B) |
 | Llama-2 | [🤗7B](https://huggingface.co/BitStack/BitStack-Llama-2-7B) / [🤗13B](https://huggingface.co/BitStack/BitStack-Llama-2-13B) / [🤗70B](https://huggingface.co/BitStack/BitStack-Llama-2-70B) |
+| Llama-3 | [🤗8B](https://huggingface.co/BitStack/BitStack-Llama-3-8B) / [🤗70B](https://huggingface.co/BitStack/BitStack-Llama-3-70B) |
+| Llama-3.1 | [🤗8B](https://huggingface.co/BitStack/BitStack-Llama-3.1-8B) / [🤗70B](https://huggingface.co/BitStack/BitStack-Llama-3.1-70B) |
+| Llama-3.1-Instruct | [🤗8B](https://huggingface.co/BitStack/BitStack-Llama-3.1-8B-Instruct) / [🤗70B](https://huggingface.co/BitStack/BitStack-Llama-3.1-70B-Instruct) |
+| Llama-3.2 | [🤗1B](https://huggingface.co/BitStack/BitStack-Llama-3.2-1B) / [🤗3B](https://huggingface.co/BitStack/BitStack-Llama-3.2-3B) |
+| Mistral-7B-v0.3 | [🤗7B](https://huggingface.co/BitStack/BitStack-Mistral-7B-v0.3)|
 
 You can download them via the following commands:
 ```
