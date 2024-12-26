@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer, LlamaRMSNorm, LlamaForCausalLM
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer, MistralRMSNorm, MistralForCausalLM
+from transformers.models.qwen2.modeling_qwen2 import Qwen2RMSNorm, Qwen2DecoderLayer, Qwen2ForCausalLM
 from collections import defaultdict
 import gc
 import functools
@@ -121,7 +122,7 @@ def auto_scale_block(module, module_kwargs, input_feat, w_bit, signed, k):
     
     scales_list = []  # return the searched scales
 
-    if isinstance(module, (LlamaDecoderLayer, MistralDecoderLayer)):
+    if isinstance(module, (LlamaDecoderLayer, MistralDecoderLayer, Qwen2DecoderLayer)):
         # attention input
         scales_list.append(
             get_scale(
@@ -184,7 +185,7 @@ def apply_scale(module, scales_list, input_feat_dict=None, fuse_scales=True):
                 new_module = ScaledActivation(prev_op, scales)
                 set_op_by_name(module, prev_op_name, new_module)
             scale_fc_fc(prev_op, layers[0], scales, fuse_scales)
-        elif isinstance(prev_op, (nn.LayerNorm, LlamaRMSNorm, MistralRMSNorm)):
+        elif isinstance(prev_op, (nn.LayerNorm, LlamaRMSNorm, MistralRMSNorm, Qwen2RMSNorm)):
             # print('scale_ln_fcs', prev_op_name, layer_names)
             if not fuse_scales:
                 new_module = ScaledActivation(prev_op, scales)
@@ -213,18 +214,20 @@ def get_blocks(model):
         layers = model.model.layers
     elif model.__class__.__name__ == "MistralForCausalLM":
         layers = model.model.layers
+    elif model.__class__.__name__ == "Qwen2ForCausalLM":
+        layers = model.model.layers
     else:
         raise NotImplementedError(type(model))
     return layers
 
 def move_embed(model, device):
-    if isinstance(model, (LlamaForCausalLM, MistralForCausalLM)):
+    if isinstance(model, (LlamaForCausalLM, MistralForCausalLM, Qwen2ForCausalLM)):
         model.model.embed_tokens = model.model.embed_tokens.to(device)
     else:
         raise NotImplementedError(type(model))
 
 def move_position_embed(model, device):
-    if isinstance(model, LlamaForCausalLM):
+    if isinstance(model, (LlamaForCausalLM, Qwen2ForCausalLM)):
         model.model.rotary_emb = model.model.rotary_emb.to(device)
     elif isinstance(model, MistralForCausalLM):
         pass

@@ -39,8 +39,11 @@ class BitStackLinear(nn.Module):
                 self.register_buffer(f'qweight_{i}', torch.zeros((out_features * in_features) // 8, dtype=torch.uint8))
             self.register_buffer(f'u_{i}', torch.zeros(out_features, self.k, dtype=torch.float16))
             self.register_buffer(f'vt_{i}', torch.zeros(self.k, in_features, dtype=torch.float16))
-            if bias:
-                self.register_buffer(f'bias_{i}', torch.zeros(out_features, dtype=torch.float16))
+
+        if bias:
+            self.register_buffer(f'bias', torch.zeros(out_features, dtype=torch.float16))
+        else:
+            self.bias = None
 
     
     def decompose_weight(self, original_weight):
@@ -73,13 +76,13 @@ class BitStackLinear(nn.Module):
 
     @classmethod
     def from_linear(cls, linear, w_bit, k=1, bias=True, no_avd=False, fused_level=0, name=None, init_only=False):
-        # assuming not bias for original Linear layer here since most of the models don't use bias these days
-        assert linear.bias is None
         qlinear = cls(w_bit=w_bit, in_features=linear.in_features, out_features=linear.out_features, bias=bias, k=k, no_avd=no_avd, dev=linear.weight.device, fused_level=fused_level)
         qlinear.name = name
         if init_only:
             return qlinear
         qlinear.decompose_weight(linear.weight)
+        if bias:
+            qlinear.bias = linear.bias
         return qlinear
 
     @torch.no_grad()
@@ -108,7 +111,7 @@ class BitStackLinear(nn.Module):
                 w += compose_weight(None, getattr(self, f'u_{i}'), getattr(self, f'vt_{i}'), self.no_avd, w.shape)
             else:
                 w += compose_weight(getattr(self, f'qweight_{i}'), getattr(self, f'u_{i}'), getattr(self, f'vt_{i}'), self.no_avd, w.shape)
-        return F.linear(x, w, bias=None)
+        return F.linear(x, w, bias=self.bias)
 
     @torch.no_grad()
     def forward_l1(self, x):
@@ -118,7 +121,7 @@ class BitStackLinear(nn.Module):
         unpacked_sign = unpack_sign_triton(self.qweight[:self.w_bit].view(-1), torch.Size([self.w_bit, self.out_features, self.in_features]))
         w = torch.matmul(self.u[:self.w_bit], self.vt[:self.w_bit])
         w = (w.mul_(unpacked_sign)).sum(dim=0).contiguous()
-        return F.linear(x, w, bias=None)
+        return F.linear(x, w, bias=self.bias)
     
     @torch.no_grad()
     def forward_l2(self, x):
@@ -126,7 +129,7 @@ class BitStackLinear(nn.Module):
         # This level unpack sign matrices and reconstruct the weight matrices with seperate triton kernels
         unpacked_sign = unpack_sign_triton(self.qweight[:self.w_bit].view(-1), torch.Size([self.w_bit, self.out_features, self.in_features]))
         w = reconstruct_w_triton(unpacked_sign, self.u[:self.w_bit], self.vt[:self.w_bit])
-        return F.linear(x, w, bias=None)
+        return F.linear(x, w, bias=self.bias)
     
     @torch.no_grad()
     def forward_l3(self, x):
@@ -134,7 +137,7 @@ class BitStackLinear(nn.Module):
         # This level fuses the unpacking and reconstruction in triton kernels
         # The N_ITER dimension is processed sequentially
         w = unpack_and_reconstruct_w_triton(self.qweight[:self.w_bit], self.u[:self.w_bit], self.vt[:self.w_bit])
-        return F.linear(x, w, bias=None)
+        return F.linear(x, w, bias=self.bias)
     
     @torch.no_grad()
     def forward_l4(self, x):
@@ -142,10 +145,11 @@ class BitStackLinear(nn.Module):
         # This level fuses the unpacking and reconstruction in triton kernels
         # The N_ITER dimension is processed in parallel
         w = unpack_and_reconstruct_w_triton_v2(self.qweight[:self.w_bit], self.u[:self.w_bit], self.vt[:self.w_bit])
-        return F.linear(x, w, bias=None)
+        return F.linear(x, w, bias=self.bias)
     
     @torch.no_grad()
     def forward_l5(self, x):
+        assert self.bias is None, "Bias is not supported for fused_level == 5"
         # Forward for fused_level == 5
         # This level fuses the reconstruction and forward computation in triton kernels
         unpacked_sign = unpack_sign_triton(self.qweight[:self.w_bit].view(-1), torch.Size([self.w_bit, self.out_features, self.in_features]))
@@ -176,33 +180,16 @@ class BitStackLinear(nn.Module):
     def set_bit(self, bit):
         self.w_bit = bit
     
-    def prepare_for_saving(self):
-        # Split concatenated tensors into individual tensors for saving
-        for i in range(self.w_bit):
-            if not self.no_avd:
-                setattr(self, f'qweight_{i}', self.qweight[i])
-            setattr(self, f'u_{i}', self.u[i])
-            setattr(self, f'vt_{i}', self.vt[i])
-            # if self.bias is not None:
-            #     setattr(self, f'bias_{i}', self.bias[i])
-        
-        for key in ['qweight', 'u', 'vt', 'bias']:
-            if hasattr(self, key):
-                delattr(self, key)
-
     def stack_blocks(self):
         # Combine individual tensors into concatenated tensors after loading
         if not self.no_avd:
             self.qweight = torch.stack([getattr(self, f'qweight_{i}') for i in range(self.w_bit)])
         self.u = torch.stack([getattr(self, f'u_{i}') for i in range(self.w_bit)])
         self.vt = torch.stack([getattr(self, f'vt_{i}') for i in range(self.w_bit)])
-        if hasattr(self, 'bias_0'):
-            self.bias = torch.stack([getattr(self, f'bias_{i}') for i in range(self.w_bit)])
+
         # Remove individual tensors to save memory
         for i in range(self.w_bit):
             if not self.no_avd:
                 delattr(self, f'qweight_{i}')
             delattr(self, f'u_{i}')
             delattr(self, f'vt_{i}')
-            if hasattr(self, f'bias_{i}'):
-                delattr(self, f'bias_{i}')

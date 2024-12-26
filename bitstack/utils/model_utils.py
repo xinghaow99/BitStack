@@ -136,13 +136,16 @@ def check_model_memory_excluding_linear(model, decomposed_modules):
     total_memory = 0
     for name, p in model.named_parameters():
         if any(exclude in name for exclude in decomposed_modules):
+            if 'bias' in name: # bias is not None
+                total_memory += p.numel() * p.element_size()
             continue
         total_memory += p.numel() * p.element_size()
     for name, b in model.named_buffers():
         if any(exclude in name for exclude in decomposed_modules):
+            if 'bias' in name: # bias is not None
+                total_memory += b.numel() * b.element_size()
             continue
         total_memory += b.numel() * b.element_size()
-
     return total_memory
 
 def int_or_str(value):
