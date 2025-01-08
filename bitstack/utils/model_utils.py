@@ -162,11 +162,17 @@ def check_module_memory(module):
         total_memory += p.numel() * p.element_size()
     return total_memory
 
+def convert_to_fp16(model):
+    for name, param in model.named_parameters():
+        if param.dtype == torch.bfloat16:
+            param.data = param.data.to(torch.float16)
+    return model
+
 def load_model_and_tokenizer(model_name_or_path):
     config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
     config.use_cache = False
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(model_name_or_path, config=config, trust_remote_code=True, torch_dtype=torch.float16, low_cpu_mem_usage=True)
+    model = AutoModelForCausalLM.from_pretrained(model_name_or_path, config=config, trust_remote_code=True, torch_dtype='auto', low_cpu_mem_usage=True)
     model.eval()
     return model, tokenizer
 

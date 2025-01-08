@@ -31,8 +31,8 @@ from bitstack.utils.model_utils import (
     retrieve_compression_config,
     load_bitstack_model_and_tokenizer,
     prepare_for_fused_forward,
-    prepare_for_saving
-
+    prepare_for_saving,
+    convert_to_fp16
 )
 from bitstack.utils.data_utils import get_loaders
 from bitstack.utils.decompose import decompose
@@ -95,9 +95,9 @@ def main():
         if args.scale_weight:
             print("Scaling weights")
             scales = scale_model(model, tokenizer, args.calib_dataset, args.seed, args.nsamples, args.seqlen, args.batch_size, args.niter, args.k, args.no_avd, args.fuse_scale)
+        model = convert_to_fp16(model)
         decompose(model, args.niter, args.k, args.no_avd, args.fused_level, init_only=False)
 
-    
     save_path = os.path.join(args.output_dir, f'{args.model_name_or_path.split("/")[-1]}_niter_{args.niter}_k_{args.k}_no_avd_{args.no_avd}_scaled_{args.scale_weight}')
     if args.do_save:
         assert not args.load_bitstack
