@@ -18,6 +18,7 @@ BitStack breaks down large language models into tiny little blocks, which can be
 
 
 ## 📰 News
+- [2025-01-08] 🎈 Add support for Mistral and Qwen models!
 - [2024-11-06] 🚀 We've released Triton kernels optimized for fused inference with BitStack models! These kernels deliver an impressive **3x** to **10x** speedup over the original implementation. Just set the `--fused_level` flag to get started! For more details, check out the speedup visualization [here](./assets/speedup_visualization.png).
 - [2024-11-01] 🎈 Try out this [Colab demo](https://colab.research.google.com/drive/1GoXIVyhofOEpGzOUint8LOivlFSDVHle?usp=sharing) and play with BitStack models across various memory budgets using an intuitive slider built with Gradio!
 - [2024-11-01] 📄 Check out our paper on [arXiv](https://arxiv.org/abs/2410.23918)!
@@ -68,6 +69,7 @@ We provide pre-decomposed models and compression configs. Currently, the followi
 | Llama-3.1-Instruct | [🤗8B](https://huggingface.co/BitStack/BitStack-Llama-3.1-8B-Instruct) / [🤗70B](https://huggingface.co/BitStack/BitStack-Llama-3.1-70B-Instruct) |
 | Llama-3.2 | [🤗1B](https://huggingface.co/BitStack/BitStack-Llama-3.2-1B) / [🤗3B](https://huggingface.co/BitStack/BitStack-Llama-3.2-3B) |
 | Mistral-7B-v0.3 | [🤗7B](https://huggingface.co/BitStack/BitStack-Mistral-7B-v0.3)|
+| Qwen-2.5 | [🤗0.5B](https://huggingface.co/BitStack/BitStack-Qwen2.5-0.5B) / [🤗1.5B](https://huggingface.co/BitStack/BitStack-Qwen2.5-1.5B) / [🤗3B](https://huggingface.co/BitStack/BitStack-Qwen2.5-3B) / [🤗7B](https://huggingface.co/BitStack/BitStack-Qwen2.5-7B) / [🤗14B](https://huggingface.co/BitStack/BitStack-Qwen2.5-14B) / [🤗32B](https://huggingface.co/BitStack/BitStack-Qwen2.5-32B) / [🤗72B](https://huggingface.co/BitStack/BitStack-Qwen2.5-72B) |
 
 You can download them via the following commands:
 ```
