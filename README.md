@@ -18,6 +18,7 @@ BitStack breaks down large language models into tiny little blocks, which can be
 
 
 ## 📰 News
+- [2025-01-22] 🎉 Our BitStack paper has been accepted to ICLR 2025!
 - [2025-01-08] 🎈 Add support for Mistral and Qwen models!
 - [2024-11-06] 🚀 We've released Triton kernels optimized for fused inference with BitStack models! These kernels deliver an impressive **3x** to **10x** speedup over the original implementation. Just set the `--fused_level` flag to get started! For more details, check out the speedup visualization [here](./assets/speedup_visualization.png).
 - [2024-11-01] 🎈 Try out this [Colab demo](https://colab.research.google.com/drive/1GoXIVyhofOEpGzOUint8LOivlFSDVHle?usp=sharing) and play with BitStack models across various memory budgets using an intuitive slider built with Gradio!
