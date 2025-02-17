@@ -2,7 +2,7 @@
   <img src="./assets/icon.png" width="180" height="150"/>
 </p>
 
-<h1 align="center">BitStack: Fine-Grained Size Control for Compressed Large Language Models in Variable Memory Environments</h1>
+<h1 align="center">BitStack: Any-Size Compression of Large Language Models in Variable Memory Environments</h1>
 
 <div align="center">
 <a href="https://arxiv.org/abs/2410.23918" target="_blank"><img src=https://img.shields.io/badge/2410.23918-red?style=plastic&logo=arxiv&logoColor=red&logoSize=auto&label=arXiv&labelColor=black&color=b31b1b&link=https%3A%2F%2Farxiv.org%2Fabs%2F2410.23918
@@ -11,7 +11,7 @@
 ></a>
 </div>
 
-![BitStack](./assets/bitstack.png)
+![BitStack](./assets/BitStack.gif)
 
 ## ✨ TL;DR
 BitStack breaks down large language models into tiny little blocks, which can be sorted and stacked universally, achieving megabyte-level memory-performance tradeoffs while maintaining or surpassing the performance of practical compression methods like GPTQ and AWQ. Check out [our paper](https://arxiv.org/abs/2410.23918) for more details!
@@ -87,10 +87,10 @@ huggingface-cli download BitStack/BitStack-Llama-3.1-8B --local-dir /YOUR/CHECKP
 
 ## 📖 Citation
 ```
-@misc{wang2024bitstackfinegrainedsizecontrol,
-      title={BitStack: Fine-Grained Size Control for Compressed Large Language Models in Variable Memory Environments}, 
+@misc{wang2025bitstackanysizecompressionlarge,
+      title={BitStack: Any-Size Compression of Large Language Models in Variable Memory Environments}, 
       author={Xinghao Wang and Pengyu Wang and Bo Wang and Dong Zhang and Yunhua Zhou and Xipeng Qiu},
-      year={2024},
+      year={2025},
       eprint={2410.23918},
       archivePrefix={arXiv},
       primaryClass={cs.CL},
